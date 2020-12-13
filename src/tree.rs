@@ -1,32 +1,51 @@
-use std::marker::PhantomData;
 use object_pool::Pool;
 use std::borrow::{Borrow, BorrowMut};
+use std::marker::PhantomData;
 
-struct StaticTree<F,A,B,O>
-    where A:Fold<O>, B:Fold<O>, F:Function<O> {
-    op1:A,
-    op2:B,
-    f:PhantomData<F>,
-    b:PhantomData<O>
+pub struct StaticTree<F, A, B, O>
+where
+    A: Fold<O>,
+    B: Fold<O>,
+    F: Operator<O>,
+{
+    pub op1: A,
+    pub op2: B,
+    pub f: F,
+    pub o: O,
 }
 
-trait Function<O> {
-    fn call(rop:&mut O, op1:&O, op2:&O);
+pub struct DynamicTree<O> {
+    pub op1: Box<dyn Fold<O>>,
+    pub op2: Box<dyn Fold<O>>,
+    pub f: Box<dyn Operator<O>>,
+    pub o: O,
 }
 
-trait Fold<O> {
-    fn fold(&self, b:&mut O, pool:&Pool<O>);
+pub trait Operator<O> {
+    fn call(&self, rop: &mut O, op1: &O, op2: &O);
 }
 
-impl<F,A,B,O> Fold<O> for StaticTree<F,A,B,O>
-    where A:Fold<O>, B:Fold<O>, F:Function<O> {
-    fn fold(&self, rop:&mut O, pool:&Pool<O>) {
-        let mut op1 = pool.try_pull().unwrap();
-        let mut op2 = pool.try_pull().unwrap();
+pub trait Fold<O> {
+    fn fold(&mut self) -> &O;
+}
 
-        self.op1.fold(op1.borrow_mut(), pool);
-        self.op2.fold(op2.borrow_mut(), pool);
+impl<F, A, B, O> Fold<O> for StaticTree<F, A, B, O>
+where
+    A: Fold<O>,
+    B: Fold<O>,
+    F: Operator<O>,
+{
+    #[inline]
+    fn fold(&mut self) -> &O {
+        let op1 = self.op1.fold();
+        let op2 = self.op2.fold();
 
-        F::call(rop, op1.borrow(), op2.borrow());
+        self.f.call(&mut self.o, op1, op2);
+
+        &self.o
     }
+}
+
+pub trait Law<O> {
+    fn call(&self, rop: &mut O, op: &Vec<O>);
 }

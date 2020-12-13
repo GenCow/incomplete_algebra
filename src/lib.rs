@@ -1,5 +1,5 @@
-
-mod tree;
+mod complex;
+pub mod tree;
 
 #[cfg(test)]
 mod tests {
